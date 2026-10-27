@@ -18,6 +18,7 @@ import android.widget.RemoteViews
 import com.fred.wordwidget.model.Sentence
 import com.fred.wordwidget.model.SentenceStore
 import com.fred.wordwidget.prefs.WidgetPrefs
+import kotlin.math.abs
 import kotlin.math.floor
 
 /**
@@ -75,7 +76,30 @@ class SentenceWidget : AppWidgetProvider() {
     ) {
         val p = WidgetPrefs(ctx)
         val s = forced ?: resolve(ctx, id, advance = false)
-        val views = RemoteViews(ctx.packageName, R.layout.widget_sentence)
+
+        // 先按实际高度定档，再选布局：
+        // RemoteViews 不会自己测量文字，拖大以后字号不会自动跟着涨，必须自己映射；
+        // 行数也必须跟着变，否则一行高的组件会把三行字画到框外面去。
+        val h = awm.getAppWidgetOptions(id)
+            .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 80)
+        val tier = when {
+            h < 85 -> 1      // 约 1 行格（4×1）：一行，字不能再小了（上一版 13sp 实测偏小）
+            h < 135 -> 2     // 约 2 行格
+            else -> 3        // 3 行格及以上
+        }
+        val sizeSp = when (tier) {
+            1 -> 18f
+            2 -> 19f
+            else -> 21f
+        }
+        val views = RemoteViews(
+            ctx.packageName,
+            when (tier) {
+                1 -> R.layout.widget_sentence_1
+                2 -> R.layout.widget_sentence_2
+                else -> R.layout.widget_sentence
+            }
+        )
 
         val (bg, textColor) = palette(ctx, p.theme(id))
         views.setInt(R.id.widgetBg, "setColorFilter", bg)
@@ -89,7 +113,8 @@ class SentenceWidget : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widgetRoot, openApp(ctx, id))
         } else {
             views.setTextViewText(R.id.tvSentence, s.text)
-            if (s.source.isEmpty()) {
+            // 一行档放不下出处行，强制隐藏
+            if (s.source.isEmpty() || tier == 1) {
                 views.setViewVisibility(R.id.tvSource, View.GONE)
             } else {
                 views.setViewVisibility(R.id.tvSource, View.VISIBLE)
@@ -102,15 +127,6 @@ class SentenceWidget : AppWidgetProvider() {
             )
         }
 
-        // 按实际高度分档：RemoteViews 不会自己测量文字，
-        // 拖大以后字号不会自动跟着涨，必须自己按尺寸映射。
-        val h = awm.getAppWidgetOptions(id)
-            .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 80)
-        val sizeSp = when {
-            h < 70 -> 13f
-            h < 110 -> 16f
-            else -> 20f
-        }
         views.setTextViewTextSize(R.id.tvSentence, TypedValue.COMPLEX_UNIT_SP, sizeSp)
         views.setTextViewTextSize(R.id.tvSource, TypedValue.COMPLEX_UNIT_SP, sizeSp * 0.68f)
 
@@ -166,6 +182,12 @@ class SentenceWidget : AppWidgetProvider() {
 
     // ===== 配色：跟随壁纸 =====
 
+    /**
+     * 取色：卡片底色 = 壁纸主色，但**亮度被推到与文字相反的一端**（0.85 / 0.15），
+     * 色相跟着壁纸走、明暗我们自己保证 —— 这样对比度是可算的，不赌系统的判断。
+     *
+     * 返回 Pair(卡片色, 文字色)。
+     */
     @SuppressLint("NewApi")
     private fun palette(ctx: Context, theme: Int): Pair<Int, Int> {
         when (theme) {
@@ -180,15 +202,34 @@ class SentenceWidget : AppWidgetProvider() {
             }
             if (wc != null) {
                 val primary = wc.primaryColor.toArgb()
-                // HINT_SUPPORTS_DARK_TEXT 是系统给的对比度判断，比自己算亮度可靠
-                val darkText = (wc.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
-                val bg = blend(primary, if (darkText) Color.WHITE else Color.BLACK, 0.35f)
-                val text = if (darkText) Color.parseColor("#2B2B2B") else Color.parseColor("#F6F4F2")
+                // 自己算亮度定深/浅字：系统给的 HINT_SUPPORTS_DARK_TEXT 只作参考，
+                // 实测部分 ROM 的 hint 与观感相反，光信它会出现"深底深字"。
+                val darkText = luminance(primary) > 0.5f
+                val bg = toLuminance(primary, if (darkText) 0.85f else 0.15f)
+                val text = if (darkText) Color.parseColor("#1F1F1E") else Color.parseColor("#FAF8F6")
                 return bg to text
             }
         }
         // API <27 没取色 API，或 ROM 返回 null：回退纸色
         return Color.parseColor("#B8B6B5") to Color.parseColor("#2B2B2B")
+    }
+
+    /** sRGB 近似亮度，0~1 */
+    private fun luminance(color: Int): Float =
+        (0.2126f * Color.red(color) +
+            0.7152f * Color.green(color) +
+            0.0722f * Color.blue(color)) / 255f
+
+    /** 朝白 / 黑混合到目标亮度：色相保留，只改明暗 */
+    private fun toLuminance(color: Int, target: Float): Int {
+        val lum = luminance(color)
+        val toWhite = target > lum
+        val dst = if (toWhite) Color.WHITE else Color.BLACK
+        val dstLum = if (toWhite) 1f else 0f
+        val ratio =
+            if (abs(dstLum - lum) < 0.001f) 0f
+            else ((target - lum) / (dstLum - lum)).coerceIn(0f, 1f)
+        return blend(color, dst, ratio)
     }
 
     private fun blend(a: Int, b: Int, ratioB: Float): Int {
