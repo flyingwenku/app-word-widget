@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingLeft="16dp"
+    android:paddingTop="16dp"
+    android:paddingRight="16dp"
+    android:paddingBottom="12dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/config_title"
+        android:textColor="@color/ink"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/mode"
+        android:textColor="@color/ink"
+        android:textSize="14sp" />
+
+    <RadioGroup
+        android:id="@+id/rgMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp">
+
+        <RadioButton
+            android:id="@+id/rbRandom"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/mode_random"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+
+        <RadioButton
+            android:id="@+id/rbSequence"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/mode_sequence"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+
+        <RadioButton
+            android:id="@+id/rbDaily"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/mode_daily"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+
+        <RadioButton
+            android:id="@+id/rbFixed"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/mode_fixed"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/tvPick"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/pick_fixed"
+        android:textColor="@color/ink"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/lvPick"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:choiceMode="singleChoice"
+        android:divider="@color/divider"
+        android:dividerHeight="1dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/theme"
+        android:textColor="@color/ink"
+        android:textSize="14sp" />
+
+    <RadioGroup
+        android:id="@+id/rgTheme"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp">
+
+        <RadioButton
+            android:id="@+id/thAuto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/theme_auto"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+
+        <RadioButton
+            android:id="@+id/thPaper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/theme_paper"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+
+        <RadioButton
+            android:id="@+id/thDark"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/theme_dark"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+    </RadioGroup>
+
+    <Button
+        android:id="@+id/btnDone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/btn_ink"
+        android:minHeight="0dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:text="@string/done"
+        android:textColor="@color/ink"
+        android:textSize="15sp" />
+</LinearLayout>

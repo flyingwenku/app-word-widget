@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 纯离线：不申请 INTERNET，也不需要任何运行时权限（零权限应用）。
+         取壁纸主色走 WallpaperManager.getWallpaperColors()，不需要权限。 -->
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
+            android:exported="true"
+            android:screenOrientation="sensorPortrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 添加小组件时的配置页；exported 必须为 true，否则系统拉不起来 -->
+        <activity
+            android:name=".ConfigActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
+            android:exported="true"
+            android:screenOrientation="sensorPortrait">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".SentenceWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sentence_widget_info" />
+        </receiver>
+    </application>
+
+</manifest>

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 小组件布局：只有文字，没有任何按钮（点击整块 = 换下一句）。
+     背景是一张半透明圆角图（widget_bg），颜色由代码按壁纸取色后用 setColorFilter 染上去，
+     这样壁纸纹理能透出来，圆角也不会丢（直接 setBackgroundColor 会把圆角盖成方块）。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widgetRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="6dp">
+
+    <ImageView
+        android:id="@+id/widgetBg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_bg" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingLeft="10dp"
+        android:paddingTop="6dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:id="@+id/tvSentence"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:lineSpacingMultiplier="1.25"
+            android:maxLines="3"
+            android:textColor="#FF2B2B2B"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/tvSource"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#B32B2B2B"
+            android:textSize="11sp" />
+    </LinearLayout>
+</FrameLayout>

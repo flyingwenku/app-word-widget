@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">一句</string>
+
+    <!-- 管理页 -->
+    <string name="main_title">一句</string>
+    <string name="main_desc">桌面句子小组件 · 添加到桌面即可显示</string>
+    <string name="hint_sentence">写一句话</string>
+    <string name="hint_source">出处（可留空）</string>
+    <string name="add">添加</string>
+    <string name="empty">还没有句子，先添加一条</string>
+    <string name="added">已添加</string>
+    <string name="need_text">句子不能为空</string>
+    <string name="hide_selected">隐藏所选</string>
+    <string name="restore_selected">恢复所选</string>
+    <string name="show_hidden">显示已隐藏（%d）</string>
+    <string name="show_visible">返回句子列表</string>
+    <string name="hidden_done">已隐藏 %d 条</string>
+    <string name="restored_done">已恢复 %d 条</string>
+    <string name="none_selected">还没勾选</string>
+    <string name="edit_title">编辑</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="settings_version">版本 %s</string>
+
+    <!-- 配置页 -->
+    <string name="config_title">小组件设置</string>
+    <string name="mode">显示方式</string>
+    <string name="mode_random">随机下一句</string>
+    <string name="mode_sequence">顺序下一句</string>
+    <string name="mode_daily">每日一句</string>
+    <string name="mode_fixed">固定这一句</string>
+    <string name="pick_fixed">选一句固定显示</string>
+    <string name="theme">配色</string>
+    <string name="theme_auto">跟随壁纸</string>
+    <string name="theme_paper">纸色</string>
+    <string name="theme_dark">深色</string>
+    <string name="done">完成</string>
+
+    <!-- 小组件 -->
+    <string name="widget_empty">还没有句子，点这里添加</string>
+</resources>

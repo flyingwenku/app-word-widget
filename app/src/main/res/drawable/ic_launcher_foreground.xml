@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 图标：一张写着三行字的卡片 = 「一句」 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="@null"
+        android:pathData="M9,13 h30 v22 h-30 z"
+        android:strokeColor="#2B2B2B"
+        android:strokeWidth="2.5" />
+    <path
+        android:fillColor="@null"
+        android:pathData="M14,20 h20 M14,26 h20 M14,31 h11"
+        android:strokeColor="#2B2B2B"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.5" />
+</vector>

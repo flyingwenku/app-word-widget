@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 半透明卡片：alpha 写在 drawable 里（40%），
+     代码用 setColorFilter 染色时走 SRC_ATOP，只换色、不改透明度，
+     所以壁纸能透出来。别在代码里改 alpha，改了圆角会跟着变。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#66FFFFFF" />
+    <corners android:radius="16dp" />
+</shape>

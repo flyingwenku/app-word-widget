@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App 界面沿用项目三的纸感配色（小组件本身另有一套"跟随壁纸"的取色逻辑） -->
+    <color name="paper">#B8B6B5</color>
+    <color name="ink">#2B2B2B</color>
+    <color name="ink_secondary">#6B6A69</color>
+    <color name="divider">#A09E9D</color>
+    <color name="launcher_bg">#B8B6B5</color>
+</resources>

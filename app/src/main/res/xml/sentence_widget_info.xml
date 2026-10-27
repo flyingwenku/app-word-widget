@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="com.fred.wordwidget.ConfigActivity"
+    android:initialLayout="@layout/widget_sentence"
+    android:minHeight="40dp"
+    android:minWidth="110dp"
+    android:previewImage="@drawable/widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="4"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable">
+
+    <!-- minWidth/minHeight = 可拖到的最小尺寸（2 格宽 × 1 格高，公式 70n−30）；
+         targetCell*（API 31+）指定默认落桌尺寸 4×2；老系统用 min 值兜底。
+         updatePeriodMillis 必须 ≥ 30 分钟，写更小会被系统直接忽略。
+         widgetFeatures=reconfigurable（API 28+）让长按可以重新配置。 -->
+</appwidget-provider>

@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingLeft="16dp"
+    android:paddingTop="16dp"
+    android:paddingRight="16dp"
+    android:paddingBottom="12dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/main_title"
+        android:textColor="@color/ink"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="@string/main_desc"
+        android:textColor="@color/ink_secondary"
+        android:textSize="12sp" />
+
+    <EditText
+        android:id="@+id/etSentence"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:hint="@string/hint_sentence"
+        android:inputType="textMultiLine"
+        android:maxLines="3"
+        android:textColor="@color/ink"
+        android:textColorHint="@color/ink_secondary"
+        android:textSize="15sp" />
+
+    <EditText
+        android:id="@+id/etSource"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/hint_source"
+        android:inputType="text"
+        android:textColor="@color/ink"
+        android:textColorHint="@color/ink_secondary"
+        android:textSize="13sp" />
+
+    <Button
+        android:id="@+id/btnAdd"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/btn_ink"
+        android:minHeight="0dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:text="@string/add"
+        android:textColor="@color/ink"
+        android:textSize="14sp" />
+
+    <ListView
+        android:id="@+id/listView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="10dp"
+        android:layout_weight="1"
+        android:divider="@color/divider"
+        android:dividerHeight="1dp" />
+
+    <TextView
+        android:id="@+id/tvEmpty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="24dp"
+        android:text="@string/empty"
+        android:textColor="@color/ink_secondary"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnAction"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/btn_ink"
+            android:minHeight="0dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:text="@string/hide_selected"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnToggle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/btn_ink"
+            android:minHeight="0dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:text="@string/show_hidden"
+            android:textColor="@color/ink"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:textColor="@color/ink_secondary"
+        android:textSize="11sp" />
+</LinearLayout>
