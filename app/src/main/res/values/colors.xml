@@ -5,5 +5,6 @@
     <color name="ink">#2B2B2B</color>
     <color name="ink_secondary">#6B6A69</color>
     <color name="divider">#A09E9D</color>
+    <color name="card">#FFFFFF</color>
     <color name="launcher_bg">#B8B6B5</color>
 </resources>

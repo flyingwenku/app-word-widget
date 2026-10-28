@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spinner 弹层背景：写死白色圆角，不吃 ROM 主题色（实测荣耀上弹层是半透明黑，
+     选中行是玫红） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/card" />
+    <corners android:radius="6dp" />
+</shape>

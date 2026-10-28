@@ -56,8 +56,9 @@ class ConfigActivity : Activity() {
         lvPick = findViewById(R.id.lvPick)
 
         lists = store.lists()
-        spList.adapter =
-            ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, lists.map { it.name })
+        val ad = ArrayAdapter(this, R.layout.item_spinner_closed, lists.map { it.name })
+        ad.setDropDownViewResource(R.layout.item_spinner_row)
+        spList.adapter = ad
         val savedId = prefs.listId(appWidgetId)
         val idx = lists.indexOfFirst { it.id == savedId }
         spList.setSelection(if (idx >= 0) idx else 0)

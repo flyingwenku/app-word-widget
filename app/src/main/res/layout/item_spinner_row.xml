@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spinner 弹层行：背景写死白色。
+     不能用系统的 simple_spinner_dropdown_item —— 荣耀等 ROM 会用自家主题色
+     （实测弹层是半透明黑 + 玫红高亮）。背景不透明白色还能盖掉系统的选中高亮。 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/card"
+    android:gravity="center_vertical"
+    android:minHeight="44dp"
+    android:paddingLeft="16dp"
+    android:paddingTop="10dp"
+    android:paddingRight="16dp"
+    android:paddingBottom="10dp"
+    android:textColor="@color/ink"
+    android:textSize="15sp" />

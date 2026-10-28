@@ -36,6 +36,22 @@
             android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- 编辑入口必须是显式按钮：v1.2 用"点整行编辑"用户根本发现不了（真机反馈） -->
+    <Button
+        android:id="@+id/btnEdit"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="8dp"
+        android:background="@drawable/btn_ink"
+        android:minHeight="0dp"
+        android:paddingLeft="10dp"
+        android:paddingTop="6dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="6dp"
+        android:text="@string/edit_title"
+        android:textColor="@color/ink"
+        android:textSize="12sp" />
+
     <Button
         android:id="@+id/btnDel"
         android:layout_width="wrap_content"

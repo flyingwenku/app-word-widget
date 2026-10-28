@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spinner 收起态：不要用系统的 simple_spinner_dropdown_item（那是给弹层行用的，
+     带选中态样式，当收起态用会出现奇怪的底色）。这里就是普通一行字。 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="44dp"
+    android:paddingLeft="8dp"
+    android:paddingTop="10dp"
+    android:paddingRight="8dp"
+    android:paddingBottom="10dp"
+    android:textColor="@color/ink"
+    android:textSize="15sp" />

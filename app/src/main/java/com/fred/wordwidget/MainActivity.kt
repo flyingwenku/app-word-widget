@@ -76,8 +76,10 @@ class MainActivity : Activity() {
 
     private fun refreshSpinner(selectId: Long = currentId) {
         val lists = store.lists()
-        spinner.adapter =
-            ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, lists.map { it.name })
+        // 收起态/弹层行都用自家布局：系统下拉行在荣耀等 ROM 上会吃 ROM 主题色（玫红高亮）
+        val ad = ArrayAdapter(this, R.layout.item_spinner_closed, lists.map { it.name })
+        ad.setDropDownViewResource(R.layout.item_spinner_row)
+        spinner.adapter = ad
         val idx = lists.indexOfFirst { it.id == selectId }
         val pos = if (idx >= 0) idx else 0
         spinner.setSelection(pos)
@@ -253,6 +255,7 @@ class MainActivity : Activity() {
             src.text = s.source
             src.visibility = if (s.source.isEmpty()) View.GONE else View.VISIBLE
 
+            v.findViewById<Button>(R.id.btnEdit).setOnClickListener { editDialog(s) }
             v.findViewById<Button>(R.id.btnDel).setOnClickListener { confirmDelete(s) }
             return v
         }
