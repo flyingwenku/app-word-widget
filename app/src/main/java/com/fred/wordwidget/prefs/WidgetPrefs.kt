@@ -15,6 +15,10 @@ class WidgetPrefs(context: Context) {
     fun mode(id: Int): Int = prefs.getInt("mode_$id", MODE_RANDOM)
     fun setMode(id: Int, v: Int) = prefs.edit().putInt("mode_$id", v).apply()
 
+    /** 这个组件用哪个句子列表；-1 = 跟随第一个列表（列表被删时也能自动兜住） */
+    fun listId(id: Int): Long = prefs.getLong("list_$id", -1L)
+    fun setListId(id: Int, v: Long) = prefs.edit().putLong("list_$id", v).apply()
+
     fun fixedId(id: Int): Long = prefs.getLong("fixed_$id", -1L)
     fun setFixedId(id: Int, v: Long) = prefs.edit().putLong("fixed_$id", v).apply()
 
@@ -32,6 +36,7 @@ class WidgetPrefs(context: Context) {
     /** 组件被删除时必须清：系统会回收复用 appWidgetId，不清的话新组件会继承旧配置 */
     fun remove(id: Int) {
         prefs.edit()
+            .remove("list_$id")
             .remove("mode_$id")
             .remove("fixed_$id")
             .remove("cursor_$id")

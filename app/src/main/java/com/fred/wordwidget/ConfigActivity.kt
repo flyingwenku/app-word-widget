@@ -5,19 +5,22 @@ import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.ListView
 import android.widget.RadioGroup
+import android.widget.Spinner
 import android.widget.TextView
 import com.fred.wordwidget.model.Sentence
+import com.fred.wordwidget.model.SentenceList
 import com.fred.wordwidget.model.SentenceStore
 import com.fred.wordwidget.prefs.WidgetPrefs
 
 /**
  * 添加小组件时弹出的配置页（android:configure 指定）。
  *
- * 选：显示方式（随机 / 顺序 / 每日 / 固定）+ 配色（跟随壁纸 / 纸色 / 深色）。
+ * 选：用哪个列表 + 显示方式（随机 / 顺序 / 每日 / 固定）+ 配色。
  * 未点「完成」就返回 → 结果保持 RESULT_CANCELED，组件不会被添加。
  */
 class ConfigActivity : Activity() {
@@ -25,7 +28,9 @@ class ConfigActivity : Activity() {
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private lateinit var prefs: WidgetPrefs
     private lateinit var store: SentenceStore
+    private lateinit var spList: Spinner
     private lateinit var lvPick: ListView
+    private var lists: List<SentenceList> = emptyList()
     private var pickItems: List<Sentence> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,16 +52,26 @@ class ConfigActivity : Activity() {
         prefs = WidgetPrefs(this)
         store = SentenceStore(this)
 
-        val tvPick = findViewById<TextView>(R.id.tvPick)
+        spList = findViewById(R.id.spList)
         lvPick = findViewById(R.id.lvPick)
-        pickItems = store.visible()
-        lvPick.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_list_item_single_choice,
-            pickItems.map { it.text }
-        )
-        if (pickItems.isNotEmpty()) lvPick.setItemChecked(0, true)
 
+        lists = store.lists()
+        spList.adapter =
+            ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, lists.map { it.name })
+        val savedId = prefs.listId(appWidgetId)
+        val idx = lists.indexOfFirst { it.id == savedId }
+        spList.setSelection(if (idx >= 0) idx else 0)
+
+        spList.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
+                refreshPick(pos)          // 换列表 → 固定句候选也要跟着换
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+        refreshPick(spList.selectedItemPosition)
+
+        val tvPick = findViewById<TextView>(R.id.tvPick)
         val rgMode = findViewById<RadioGroup>(R.id.rgMode)
         rgMode.setOnCheckedChangeListener { _, checkedId ->
             val show = checkedId == R.id.rbFixed
@@ -67,7 +82,19 @@ class ConfigActivity : Activity() {
         findViewById<Button>(R.id.btnDone).setOnClickListener { save() }
     }
 
+    /** 固定句候选 = 当前选中列表里的句子 */
+    private fun refreshPick(pos: Int) {
+        pickItems = lists.getOrNull(pos)?.items?.toList() ?: emptyList()
+        lvPick.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_single_choice,
+            pickItems.map { it.text }
+        )
+        if (pickItems.isNotEmpty()) lvPick.setItemChecked(0, true)
+    }
+
     private fun save() {
+        val listId = lists.getOrNull(spList.selectedItemPosition)?.id ?: -1L
         val mode = when (findViewById<RadioGroup>(R.id.rgMode).checkedRadioButtonId) {
             R.id.rbSequence -> WidgetPrefs.MODE_SEQUENCE
             R.id.rbDaily -> WidgetPrefs.MODE_DAILY
@@ -80,6 +107,7 @@ class ConfigActivity : Activity() {
             else -> WidgetPrefs.THEME_AUTO
         }
 
+        prefs.setListId(appWidgetId, listId)
         prefs.setMode(appWidgetId, mode)
         prefs.setTheme(appWidgetId, theme)
         if (mode == WidgetPrefs.MODE_FIXED) {

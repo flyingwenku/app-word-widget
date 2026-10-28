@@ -137,45 +137,48 @@ class SentenceWidget : AppWidgetProvider() {
 
     private fun resolve(ctx: Context, id: Int, advance: Boolean): Sentence? {
         val store = SentenceStore(ctx)
-        val visible = store.visible()
-        if (visible.isEmpty()) return null
-
         val p = WidgetPrefs(ctx)
+
+        // 每个组件用自己选的列表；列表被删了就退回第一个，不至于显示空白
+        val target = store.list(p.listId(id)) ?: store.firstList()
+        val items = target?.items ?: return null
+        if (items.isEmpty()) return null
+
         val cur = p.currentId(id)
-        val stillThere = visible.any { it.id == cur }
+        val stillThere = items.any { it.id == cur }
 
         return when (p.mode(id)) {
             WidgetPrefs.MODE_SEQUENCE -> {
                 if (advance || !stillThere) {
-                    val idx = p.cursor(id).coerceIn(0, visible.size - 1)
-                    val pick = visible[idx]
+                    val idx = p.cursor(id).coerceIn(0, items.size - 1)
+                    val pick = items[idx]
                     p.setCursor(id, idx + 1)
                     p.setCurrentId(id, pick.id)
                     pick
-                } else visible.first { it.id == cur }
+                } else items.first { it.id == cur }
             }
 
             WidgetPrefs.MODE_DAILY -> {
                 val day = floor(System.currentTimeMillis() / 86_400_000.0).toLong().toInt()
-                val idx = ((day % visible.size) + visible.size) % visible.size
-                val pick = visible[idx]
+                val idx = ((day % items.size) + items.size) % items.size
+                val pick = items[idx]
                 p.setCurrentId(id, pick.id)
                 pick
             }
 
             WidgetPrefs.MODE_FIXED -> {
                 val fixed = p.fixedId(id)
-                visible.find { it.id == fixed } ?: visible.first().also { p.setCurrentId(id, it.id) }
+                items.find { it.id == fixed } ?: items.first().also { p.setCurrentId(id, it.id) }
             }
 
             else -> {   // MODE_RANDOM
                 if (advance || !stillThere) {
                     // 抽新的，且尽量不抽到当前这句
-                    val pool = visible.filter { it.id != cur }.ifEmpty { visible }
+                    val pool = items.filter { it.id != cur }.ifEmpty { items }
                     val pick = pool[(Math.random() * pool.size).toInt().coerceIn(0, pool.size - 1)]
                     p.setCurrentId(id, pick.id)
                     pick
-                } else visible.first { it.id == cur }
+                } else items.first { it.id == cur }
             }
         }
     }

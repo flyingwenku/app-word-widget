@@ -4,27 +4,34 @@
 
     <!-- 管理页 -->
     <string name="main_title">一句</string>
-    <string name="main_desc">桌面句子小组件 · 添加到桌面即可显示</string>
+    <string name="main_desc">先选一个列表，再增删改句子；桌面上每个组件可以用自己的列表</string>
     <string name="hint_sentence">写一句话</string>
     <string name="hint_source">出处（可留空）</string>
     <string name="add">添加</string>
-    <string name="empty">还没有句子，先添加一条</string>
-    <string name="added">已添加</string>
+    <string name="empty">这个列表还没有句子</string>
     <string name="need_text">句子不能为空</string>
-    <string name="hide_selected">隐藏所选</string>
-    <string name="restore_selected">恢复所选</string>
-    <string name="show_hidden">显示已隐藏（%d）</string>
-    <string name="show_visible">返回句子列表</string>
-    <string name="hidden_done">已隐藏 %d 条</string>
-    <string name="restored_done">已恢复 %d 条</string>
-    <string name="none_selected">还没勾选</string>
     <string name="edit_title">编辑</string>
     <string name="save">保存</string>
     <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+    <string name="delete_confirm">删除这一句？删了就找不回来了</string>
+    <string name="deleted">已删除</string>
     <string name="settings_version">版本 %s</string>
+
+    <!-- 列表 -->
+    <string name="list_manage">管理列表</string>
+    <string name="list_pick">列表</string>
+    <string name="list_new">新建列表</string>
+    <string name="list_rename">重命名当前列表</string>
+    <string name="list_delete">删除当前列表</string>
+    <string name="list_name_hint">列表名</string>
+    <string name="list_delete_confirm">删除列表「%s」？里面的句子一起删掉</string>
+    <string name="list_last_one">至少保留一个列表</string>
+    <string name="list_need_name">列表名不能为空</string>
 
     <!-- 配置页 -->
     <string name="config_title">小组件设置</string>
+    <string name="config_list">用哪个列表</string>
     <string name="mode">显示方式</string>
     <string name="mode_random">随机下一句</string>
     <string name="mode_sequence">顺序下一句</string>

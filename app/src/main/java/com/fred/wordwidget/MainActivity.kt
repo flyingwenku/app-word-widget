@@ -5,35 +5,37 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import com.fred.wordwidget.model.Sentence
 import com.fred.wordwidget.model.SentenceStore
 
 /**
- * 管理页：句子的增删改，**以及唯一的"删除"入口**——批量隐藏 / 批量恢复。
+ * 管理页：**多列表 + 句子增删改查**。
  *
- * 小组件上不放任何按钮（包括删除按钮），删除全部在这里做（用户已确认）。
+ * v1.2 起不再有"隐藏 / 恢复"那套软删除——内容就是普通的增删改查，删了就是真删。
+ * 顶部的下拉框切换列表，「管理列表」里可以新建 / 重命名 / 删除列表；
+ * 桌面上每个组件各自选一个列表（配置页里选）。
  */
 class MainActivity : Activity() {
 
     private lateinit var store: SentenceStore
+    private lateinit var spinner: Spinner
     private lateinit var listView: ListView
     private lateinit var tvEmpty: TextView
-    private lateinit var btnAction: Button
-    private lateinit var btnToggle: Button
     private lateinit var etSentence: EditText
     private lateinit var etSource: EditText
     private lateinit var adapter: Adapter
 
-    private val selected = HashSet<Long>()
-    private var showingHidden = false
+    private var currentId: Long = -1L          // 当前列表
     private var items: List<Sentence> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,10 +43,9 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
 
         store = SentenceStore(this)
+        spinner = findViewById(R.id.spinnerLists)
         listView = findViewById(R.id.listView)
         tvEmpty = findViewById(R.id.tvEmpty)
-        btnAction = findViewById(R.id.btnAction)
-        btnToggle = findViewById(R.id.btnToggle)
         etSentence = findViewById(R.id.etSentence)
         etSource = findViewById(R.id.etSource)
 
@@ -55,57 +56,127 @@ class MainActivity : Activity() {
         listView.adapter = adapter
         listView.setOnItemClickListener { _, _, position, _ -> editDialog(items[position]) }
 
-        findViewById<Button>(R.id.btnAdd).setOnClickListener { addSentence() }
-        btnAction.setOnClickListener { applyBatch() }
-        btnToggle.setOnClickListener {
-            showingHidden = !showingHidden
-            selected.clear()
-            reload()
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
+                val l = store.lists().getOrNull(pos) ?: return
+                currentId = l.id
+                reload()
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
         }
 
+        findViewById<Button>(R.id.btnAdd).setOnClickListener { addSentence() }
+        findViewById<Button>(R.id.btnLists).setOnClickListener { manageLists() }
+
+        refreshSpinner()
+    }
+
+    // ===== 列表 =====
+
+    private fun refreshSpinner(selectId: Long = currentId) {
+        val lists = store.lists()
+        spinner.adapter =
+            ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, lists.map { it.name })
+        val idx = lists.indexOfFirst { it.id == selectId }
+        val pos = if (idx >= 0) idx else 0
+        spinner.setSelection(pos)
+        currentId = lists.getOrNull(pos)?.id ?: -1L
         reload()
     }
+
+    private fun manageLists() {
+        val options = arrayOf(
+            getString(R.string.list_new),
+            getString(R.string.list_rename),
+            getString(R.string.list_delete)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.list_manage)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> newListDialog()
+                    1 -> renameDialog()
+                    2 -> deleteListDialog()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun newListDialog() {
+        val input = EditText(this).apply { hint = getString(R.string.list_name_hint) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.list_new)
+            .setView(padded(input))
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isEmpty()) {
+                    toast(R.string.list_need_name)
+                    return@setPositiveButton
+                }
+                val l = store.addList(name)
+                SentenceWidget.refreshAll(this)
+                refreshSpinner(l.id)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun renameDialog() {
+        val l = store.list(currentId) ?: return
+        val input = EditText(this).apply {
+            setText(l.name)
+            setSelection(l.name.length)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.list_rename)
+            .setView(padded(input))
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isEmpty()) {
+                    toast(R.string.list_need_name)
+                    return@setPositiveButton
+                }
+                store.renameList(l.id, name)
+                SentenceWidget.refreshAll(this)
+                refreshSpinner(l.id)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun deleteListDialog() {
+        val lists = store.lists()
+        val l = store.list(currentId) ?: return
+        if (lists.size <= 1) {
+            toast(R.string.list_last_one)
+            return
+        }
+        AlertDialog.Builder(this)
+            .setMessage(getString(R.string.list_delete_confirm, l.name))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                store.deleteList(l.id)
+                SentenceWidget.refreshAll(this)
+                refreshSpinner(store.firstList()?.id ?: -1L)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    // ===== 句子 =====
 
     private fun addSentence() {
         val text = etSentence.text.toString().trim()
         if (text.isEmpty()) {
-            Toast.makeText(this, R.string.need_text, Toast.LENGTH_SHORT).show()
+            toast(R.string.need_text)
             return
         }
-        store.add(text, etSource.text.toString())
+        store.addSentence(currentId, text, etSource.text.toString())
         etSentence.setText("")
         etSource.setText("")
         reload()
         SentenceWidget.refreshAll(this)
-    }
-
-    /** 批量隐藏（可见列表）或批量恢复（已隐藏列表） */
-    private fun applyBatch() {
-        if (selected.isEmpty()) {
-            Toast.makeText(this, R.string.none_selected, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val n = selected.size
-        store.setHidden(selected, !showingHidden)
-        selected.clear()
-        reload()
-        SentenceWidget.refreshAll(this)
-        Toast.makeText(
-            this,
-            if (showingHidden) getString(R.string.restored_done, n) else getString(R.string.hidden_done, n),
-            Toast.LENGTH_SHORT
-        ).show()
-    }
-
-    private fun reload() {
-        items = if (showingHidden) store.hidden() else store.visible()
-        adapter.notifyDataSetChanged()
-
-        listView.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
-        tvEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
-
-        btnAction.text = if (showingHidden) getString(R.string.restore_selected) else getString(R.string.hide_selected)
-        btnToggle.text = if (showingHidden) getString(R.string.show_visible) else getString(R.string.show_hidden, store.hidden().size)
     }
 
     private fun editDialog(s: Sentence) {
@@ -118,22 +189,55 @@ class MainActivity : Activity() {
         val src = EditText(this).apply { setText(s.source) }
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val pad = (16 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
             addView(input)
             addView(src)
         }
         AlertDialog.Builder(this)
             .setTitle(R.string.edit_title)
-            .setView(box)
+            .setView(padded(box))
             .setPositiveButton(R.string.save) { _, _ ->
-                store.update(s.id, input.text.toString(), src.text.toString())
+                store.updateSentence(currentId, s.id, input.text.toString(), src.text.toString())
                 reload()
                 SentenceWidget.refreshAll(this)
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
+
+    private fun confirmDelete(s: Sentence) {
+        AlertDialog.Builder(this)
+            .setMessage(R.string.delete_confirm)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                store.deleteSentence(currentId, s.id)
+                reload()
+                SentenceWidget.refreshAll(this)
+                toast(R.string.deleted)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun reload() {
+        val l = store.list(currentId) ?: store.firstList()
+        currentId = l?.id ?: -1L
+        items = l?.items?.toList() ?: emptyList()
+        adapter.notifyDataSetChanged()
+
+        listView.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+        tvEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    // ===== 小工具 =====
+
+    private fun padded(v: View): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        setPadding(pad, pad / 2, pad, 0)
+        addView(v)
+    }
+
+    private fun toast(resId: Int) =
+        Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
 
     private inner class Adapter : BaseAdapter() {
         override fun getCount(): Int = items.size
@@ -144,17 +248,12 @@ class MainActivity : Activity() {
             val v = convertView ?: layoutInflater.inflate(R.layout.item_sentence, parent, false)
             val s = items[position]
 
-            val cb = v.findViewById<CheckBox>(R.id.cbSel)
-            cb.setOnCheckedChangeListener(null)          // 复用行时先解绑，避免错乱
-            cb.isChecked = selected.contains(s.id)
-            cb.setOnCheckedChangeListener { _, on ->
-                if (on) selected.add(s.id) else selected.remove(s.id)
-            }
-
             v.findViewById<TextView>(R.id.tvText).text = s.text
             val src = v.findViewById<TextView>(R.id.tvSource)
             src.text = s.source
             src.visibility = if (s.source.isEmpty()) View.GONE else View.VISIBLE
+
+            v.findViewById<Button>(R.id.btnDel).setOnClickListener { confirmDelete(s) }
             return v
         }
     }

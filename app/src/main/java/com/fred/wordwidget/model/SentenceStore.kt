@@ -6,89 +6,164 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * 句子库：App 私有目录下的 JSON（沿用项目三的存储做法，零依赖）。
+ * 句子库：多个**有名字的列表**，每个列表里是普通的句子（增删改查，删了就是真删）。
  *
- * 首次启动预置一批《论语》句子，方便开箱即测；不喜欢可以在管理页批量隐藏。
+ * 存储：App 私有目录 lists.json（沿用项目三的 JSON 做法，零依赖）。
+ * 首次启动预置一个「论语」列表，方便开箱即测。
+ *
+ * 迁移：v1.0 用的是 sentences.json（单层句子 + hidden 标记），
+ * 这里会把里面**没被隐藏**的句子收进一个「论语」列表；
+ * 被隐藏的那部分按"用户已经删掉了"处理，不再恢复。
  */
 class SentenceStore(context: Context) {
 
-    private val file = File(context.filesDir, "sentences.json")
-    private val list: MutableList<Sentence> = load()
+    private val dir = context.filesDir
+    private val file = File(dir, "lists.json")
+    private val legacyFile = File(dir, "sentences.json")
+    private val lists: MutableList<SentenceList> = load()
 
-    private fun load(): MutableList<Sentence> {
-        if (!file.exists()) {
-            val seed = presets()
-            save(seed)
-            return seed.toMutableList()
-        }
-        return try {
-            val arr = JSONObject(file.readText()).optJSONArray("items") ?: return presets().toMutableList()
-            val out = mutableListOf<Sentence>()
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                out.add(
-                    Sentence(
-                        o.getLong("id"),
-                        o.getString("t"),
-                        o.optString("s", ""),
-                        o.optBoolean("h", false)
-                    )
-                )
-            }
-            if (out.isEmpty()) presets().toMutableList() else out
-        } catch (e: Exception) {
-            presets().toMutableList()
+    // ===== 列表级 =====
+
+    fun lists(): List<SentenceList> = lists
+    fun list(id: Long): SentenceList? = lists.find { it.id == id }
+    fun firstList(): SentenceList? = lists.firstOrNull()
+
+    fun addList(name: String): SentenceList {
+        val l = SentenceList(nextListId(), name.trim().ifEmpty { "新列表" })
+        lists.add(l)
+        save()
+        return l
+    }
+
+    fun renameList(id: Long, name: String) {
+        val l = list(id) ?: return
+        val n = name.trim()
+        if (n.isEmpty()) return
+        l.name = n
+        save()
+    }
+
+    /** 删除整个列表。至少保留一个（组件总要有个数据源） */
+    fun deleteList(id: Long) {
+        if (lists.size <= 1) return
+        // 不用 removeIf：那是 Java 8 的 Collection 默认方法，API 24 才有（本项目 minSdk 21）
+        val i = lists.indexOfFirst { it.id == id }
+        if (i >= 0) {
+            lists.removeAt(i)
+            save()
         }
     }
 
-    fun all(): List<Sentence> = list
-    fun visible(): List<Sentence> = list.filter { !it.hidden }
-    fun hidden(): List<Sentence> = list.filter { it.hidden }
+    // ===== 句子级 =====
 
-    fun add(text: String, source: String): Sentence {
-        val s = Sentence(nextId(), text.trim(), source.trim())
-        list.add(s)
-        save(list)
+    fun addSentence(listId: Long, text: String, source: String): Sentence? {
+        val l = list(listId) ?: firstList() ?: return null
+        val s = Sentence(nextItemId(l), text.trim(), source.trim())
+        l.items.add(s)
+        save()
         return s
     }
 
-    fun update(id: Long, text: String, source: String) {
-        val i = list.indexOfFirst { it.id == id }
+    fun updateSentence(listId: Long, sentenceId: Long, text: String, source: String) {
+        val l = list(listId) ?: return
+        val i = l.items.indexOfFirst { it.id == sentenceId }
+        if (i < 0) return
+        l.items[i] = l.items[i].copy(text = text.trim(), source = source.trim())
+        save()
+    }
+
+    fun deleteSentence(listId: Long, sentenceId: Long) {
+        val l = list(listId) ?: return
+        val i = l.items.indexOfFirst { it.id == sentenceId }
         if (i >= 0) {
-            list[i] = list[i].copy(text = text.trim(), source = source.trim())
-            save(list)
+            l.items.removeAt(i)
+            save()
         }
     }
 
-    /** 软删除 / 恢复：只改标记，不动数据 */
-    fun setHidden(ids: Collection<Long>, hidden: Boolean) {
-        val set = ids.toSet()
-        if (set.isEmpty()) return
-        for (i in list.indices) {
-            if (list[i].id in set) list[i] = list[i].copy(hidden = hidden)
+    // ===== 持久化 =====
+
+    private fun load(): MutableList<SentenceList> {
+        if (file.exists()) {
+            return try {
+                val arr = JSONObject(file.readText()).optJSONArray("lists") ?: return presets()
+                val out = mutableListOf<SentenceList>()
+                for (i in 0 until arr.length()) {
+                    val lo = arr.getJSONObject(i)
+                    val items = mutableListOf<Sentence>()
+                    val ia = lo.optJSONArray("items")
+                    if (ia != null) {
+                        for (j in 0 until ia.length()) {
+                            val o = ia.getJSONObject(j)
+                            items.add(Sentence(o.getLong("id"), o.getString("t"), o.optString("s", "")))
+                        }
+                    }
+                    out.add(SentenceList(lo.getLong("id"), lo.optString("n", "列表"), items))
+                }
+                if (out.isEmpty()) presets() else out
+            } catch (e: Exception) {
+                presets()
+            }
         }
-        save(list)
+        return migrateLegacy() ?: presets()
     }
 
-    private fun nextId(): Long = (list.maxOfOrNull { it.id } ?: 0L) + 1
+    private fun migrateLegacy(): MutableList<SentenceList>? {
+        if (!legacyFile.exists()) return null
+        return try {
+            val arr = JSONObject(legacyFile.readText()).optJSONArray("items") ?: return null
+            val items = mutableListOf<Sentence>()
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                if (o.optBoolean("h", false)) continue       // 隐藏过的 = 用户已删，不恢复
+                items.add(Sentence(o.getLong("id"), o.getString("t"), o.optString("s", "")))
+            }
+            if (items.isEmpty()) return null
+            val l = SentenceList(1L, "论语", items)
+            val out = mutableListOf(l)
+            save(out)                                         // 写成新格式；旧文件保留，方便回滚
+            out
+        } catch (e: Exception) {
+            null
+        }
+    }
 
-    private fun save(items: List<Sentence>) {
+    private fun save(items: List<SentenceList> = lists) {
         val arr = JSONArray()
-        items.forEach { s ->
+        items.forEach { l ->
+            val ia = JSONArray()
+            l.items.forEach { s ->
+                ia.put(
+                    JSONObject().apply {
+                        put("id", s.id)
+                        put("t", s.text)
+                        put("s", s.source)
+                    }
+                )
+            }
             arr.put(
                 JSONObject().apply {
-                    put("id", s.id)
-                    put("t", s.text)
-                    put("s", s.source)
-                    put("h", s.hidden)
+                    put("id", l.id)
+                    put("n", l.name)
+                    put("items", ia)
                 }
             )
         }
-        file.writeText(JSONObject().put("items", arr).toString())
+        file.writeText(JSONObject().put("lists", arr).toString())
     }
 
-    private fun presets(): List<Sentence> =
-        PRESET.mapIndexed { i, (text, source) -> Sentence((i + 1).toLong(), text, source) }
+    private fun nextListId(): Long = (lists.maxOfOrNull { it.id } ?: 0L) + 1
+    private fun nextItemId(l: SentenceList): Long = (l.items.maxOfOrNull { it.id } ?: 0L) + 1
+
+    private fun presets(): MutableList<SentenceList> =
+        mutableListOf(
+            SentenceList(
+                1L,
+                "论语",
+                PRESET.mapIndexed { i, (text, source) -> Sentence((i + 1).toLong(), text, source) }
+                    .toMutableList()
+            )
+        )
 
     companion object {
         /** 预置《论语》：开箱即可看到效果，不需要先自己录入 */

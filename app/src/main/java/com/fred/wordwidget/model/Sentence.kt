@@ -3,12 +3,10 @@ package com.fred.wordwidget.model
 /**
  * 一条句子。
  *
- * hidden = 软删除标记：用户点"删除"时只打这个标记，数据还在，
- * 可在「已隐藏」列表里恢复（需求原文：不是真删除，标记不显示而已）。
+ * v1.2 起取消软删除（hidden 标记）：内容就是普通的增删改查，删了就是真删。
  */
 data class Sentence(
     val id: Long,
     val text: String,
-    val source: String = "",
-    val hidden: Boolean = false
+    val source: String = ""
 )

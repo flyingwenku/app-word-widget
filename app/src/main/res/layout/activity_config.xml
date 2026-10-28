@@ -20,6 +20,20 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
+        android:text="@string/config_list"
+        android:textColor="@color/ink"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/spList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
         android:text="@string/mode"
         android:textColor="@color/ink"
         android:textSize="14sp" />
