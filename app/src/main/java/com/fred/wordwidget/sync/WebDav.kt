@@ -31,6 +31,14 @@ internal class WebDav(private val fileUrl: String, private val user: String, pri
     fun fetch(): Fetched {
         val c = URL(fileUrl).openConnection() as HttpURLConnection
         return try {
+            // 坚果云的响应头是 Cache-Control: max-age=5 —— GET 结果允许被缓存 5 秒。
+            // 一旦被缓存（ROM / Wi-Fi 代理 / 移动网络都可能），第二次同步拿到的还是上一次的
+            // ETag，而服务端此时已经换过了 → 必然 412，还会连着失败三次
+            // （就是那个"云端一直被别的一端改写"）。同步场景里 GET 绝不能用缓存。
+            c.useCaches = false
+            c.setRequestProperty("Cache-Control", "no-cache")
+            c.setRequestProperty("Pragma", "no-cache")
+
             c.setRequestProperty("Authorization", auth())
             c.connectTimeout = CONNECT_TIMEOUT
             c.readTimeout = READ_TIMEOUT
