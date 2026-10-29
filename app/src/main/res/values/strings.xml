@@ -44,6 +44,20 @@
     <string name="theme_dark">深色</string>
     <string name="done">完成</string>
 
+    <!-- 多端同步 -->
+    <string name="sync">同步</string>
+    <string name="sync_settings">同步设置</string>
+    <string name="sync_url">WebDAV 地址</string>
+    <string name="sync_user">账号（坚果云邮箱）</string>
+    <string name="sync_pass">应用密码（不是登录密码）</string>
+    <string name="sync_hint">密码在坚果云网页端「账户信息 → 添加应用」里生成；云端要先建好 Yiju 文件夹</string>
+    <string name="sync_need_account">还没填同步账号</string>
+    <string name="sync_first_upload">已上传到云端（首次同步）</string>
+    <string name="sync_up_to_date">已是最新（从云端取回改动）</string>
+    <string name="sync_done">同步完成</string>
+    <string name="sync_conflict_retry">云端一直被别的一端改写，稍后再试</string>
+    <string name="sync_failed">同步失败：%s</string>
+
     <!-- 小组件 -->
     <string name="widget_empty">还没有句子，点这里添加</string>
 </resources>

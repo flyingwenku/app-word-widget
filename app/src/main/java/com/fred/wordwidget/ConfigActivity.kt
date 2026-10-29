@@ -51,6 +51,7 @@ class ConfigActivity : Activity() {
 
         prefs = WidgetPrefs(this)
         store = SentenceStore(this)
+        prefs.migrateToUuid(store)
 
         spList = findViewById(R.id.spList)
         lvPick = findViewById(R.id.lvPick)
@@ -59,8 +60,8 @@ class ConfigActivity : Activity() {
         val ad = ArrayAdapter(this, R.layout.item_spinner_closed, lists.map { it.name })
         ad.setDropDownViewResource(R.layout.item_spinner_row)
         spList.adapter = ad
-        val savedId = prefs.listId(appWidgetId)
-        val idx = lists.indexOfFirst { it.id == savedId }
+        val savedUuid = prefs.listUuid(appWidgetId)
+        val idx = lists.indexOfFirst { it.uuid == savedUuid }
         spList.setSelection(if (idx >= 0) idx else 0)
 
         spList.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -83,9 +84,9 @@ class ConfigActivity : Activity() {
         findViewById<Button>(R.id.btnDone).setOnClickListener { save() }
     }
 
-    /** 固定句候选 = 当前选中列表里的句子 */
+    /** 固定句候选 = 当前选中列表里没被删掉的句子 */
     private fun refreshPick(pos: Int) {
-        pickItems = lists.getOrNull(pos)?.items?.toList() ?: emptyList()
+        pickItems = lists.getOrNull(pos)?.alive() ?: emptyList()
         lvPick.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_list_item_single_choice,
@@ -95,7 +96,7 @@ class ConfigActivity : Activity() {
     }
 
     private fun save() {
-        val listId = lists.getOrNull(spList.selectedItemPosition)?.id ?: -1L
+        val listUuid = lists.getOrNull(spList.selectedItemPosition)?.uuid ?: ""
         val mode = when (findViewById<RadioGroup>(R.id.rgMode).checkedRadioButtonId) {
             R.id.rbSequence -> WidgetPrefs.MODE_SEQUENCE
             R.id.rbDaily -> WidgetPrefs.MODE_DAILY
@@ -108,12 +109,12 @@ class ConfigActivity : Activity() {
             else -> WidgetPrefs.THEME_AUTO
         }
 
-        prefs.setListId(appWidgetId, listId)
+        prefs.setListUuid(appWidgetId, listUuid)
         prefs.setMode(appWidgetId, mode)
         prefs.setTheme(appWidgetId, theme)
         if (mode == WidgetPrefs.MODE_FIXED) {
             val pos = lvPick.checkedItemPosition
-            if (pos in pickItems.indices) prefs.setFixedId(appWidgetId, pickItems[pos].id)
+            if (pos in pickItems.indices) prefs.setFixedUuid(appWidgetId, pickItems[pos].uuid)
         }
 
         // 立刻渲染一次，不用等 30 分钟周期

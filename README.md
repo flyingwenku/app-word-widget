@@ -38,7 +38,7 @@ AppWidgetProvider（onUpdate / onDeleted / onAppWidgetOptionsChanged）
 |---|---|---|
 | 小组件实现 | 系统 `AppWidgetProvider` + `RemoteViews` | Jetpack Glance 要求 minSdk 23，本项目要 21 |
 | 依赖 | **只有 androidx.core-ktx** | 沿用前三个项目的最小依赖原则 |
-| 权限 | **零**（连 INTERNET 都不申请） | 纯离线；取壁纸主色不需要权限 |
+| 权限 | **只有 INTERNET**（v1.4 起） | 多端同步要走 WebDAV；取壁纸主色不需要权限 |
 | 存储 | JSON + SharedPreferences | 句子量级很小，不引数据库 |
 
 ## minSdk 21 / 新版 Android 避坑

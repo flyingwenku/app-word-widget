@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 纯离线：不申请 INTERNET，也不需要任何运行时权限（零权限应用）。
-         取壁纸主色走 WallpaperManager.getWallpaperColors()，不需要权限。 -->
+    <!-- v1.4 起多了一个权限：多端同步要走 WebDAV（坚果云）。
+         取壁纸主色走 WallpaperManager.getWallpaperColors()，不需要权限；
+         同步也**不需要运行时动态申请**（INTERNET 是普通权限，装的时候给）。 -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"

@@ -139,13 +139,16 @@ class SentenceWidget : AppWidgetProvider() {
         val store = SentenceStore(ctx)
         val p = WidgetPrefs(ctx)
 
+        p.migrateToUuid(store)
+
         // 每个组件用自己选的列表；列表被删了就退回第一个，不至于显示空白
-        val target = store.list(p.listId(id)) ?: store.firstList()
-        val items = target?.items ?: return null
+        val target = store.list(p.listUuid(id)) ?: store.firstList()
+        // 只显示没删掉的：墓碑是给同步用的，不该被选中
+        val items = target?.alive() ?: return null
         if (items.isEmpty()) return null
 
-        val cur = p.currentId(id)
-        val stillThere = items.any { it.id == cur }
+        val cur = p.currentUuid(id)
+        val stillThere = items.any { it.uuid == cur }
 
         return when (p.mode(id)) {
             WidgetPrefs.MODE_SEQUENCE -> {
@@ -153,32 +156,32 @@ class SentenceWidget : AppWidgetProvider() {
                     val idx = p.cursor(id).coerceIn(0, items.size - 1)
                     val pick = items[idx]
                     p.setCursor(id, idx + 1)
-                    p.setCurrentId(id, pick.id)
+                    p.setCurrentUuid(id, pick.uuid)
                     pick
-                } else items.first { it.id == cur }
+                } else items.first { it.uuid == cur }
             }
 
             WidgetPrefs.MODE_DAILY -> {
                 val day = floor(System.currentTimeMillis() / 86_400_000.0).toLong().toInt()
                 val idx = ((day % items.size) + items.size) % items.size
                 val pick = items[idx]
-                p.setCurrentId(id, pick.id)
+                p.setCurrentUuid(id, pick.uuid)
                 pick
             }
 
             WidgetPrefs.MODE_FIXED -> {
-                val fixed = p.fixedId(id)
-                items.find { it.id == fixed } ?: items.first().also { p.setCurrentId(id, it.id) }
+                val fixed = p.fixedUuid(id)
+                items.find { it.uuid == fixed } ?: items.first().also { p.setCurrentUuid(id, it.uuid) }
             }
 
             else -> {   // MODE_RANDOM
                 if (advance || !stillThere) {
                     // 抽新的，且尽量不抽到当前这句
-                    val pool = items.filter { it.id != cur }.ifEmpty { items }
+                    val pool = items.filter { it.uuid != cur }.ifEmpty { items }
                     val pick = pool[(Math.random() * pool.size).toInt().coerceIn(0, pool.size - 1)]
-                    p.setCurrentId(id, pick.id)
+                    p.setCurrentUuid(id, pick.uuid)
                     pick
-                } else items.first { it.id == cur }
+                } else items.first { it.uuid == cur }
             }
         }
     }
