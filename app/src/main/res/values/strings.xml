@@ -51,6 +51,7 @@
     <string name="sync_user">账号（坚果云邮箱）</string>
     <string name="sync_pass">应用密码（不是登录密码）</string>
     <string name="sync_hint">密码在坚果云网页端「账户信息 → 添加应用」里生成；云端要先建好 Yiju 文件夹</string>
+    <string name="sync_in_progress">上一次还没传完，稍后再点</string>
     <string name="sync_need_account">还没填同步账号</string>
     <string name="sync_first_upload">已上传到云端（首次同步）</string>
     <string name="sync_up_to_date">已是最新（从云端取回改动）</string>

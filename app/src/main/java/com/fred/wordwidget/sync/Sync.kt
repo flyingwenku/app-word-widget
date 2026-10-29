@@ -19,8 +19,29 @@ import java.util.UUID
  */
 class Sync(private val context: Context, private val store: SentenceStore) {
 
+    private val running = Any()
+
     /** 返回一句人话，直接显示在界面上 */
     fun syncNow(): String {
+        // 同时只允许一个同步在跑。以前没有这个保护：连点几下（或打开页面时的自动同步
+        // 跟手动点那一下撞上）就会两个线程拿着同一个 ETag 去写，
+        // 一个成功、另一个必被服务端判 412 —— 表现就是"云端一直被别的一端改写"
+        synchronized(running) {
+            if (busy) return context.getString(com.fred.wordwidget.R.string.sync_in_progress)
+            busy = true
+        }
+
+        try {
+            return doSync()
+        } finally {
+            busy = false
+        }
+    }
+
+    @Volatile
+    private var busy = false
+
+    private fun doSync(): String {
         val cfg = SyncPrefs(context)
         if (!cfg.ready) return context.getString(com.fred.wordwidget.R.string.sync_need_account)
         cfg.lastAttemptAt = System.currentTimeMillis()
@@ -33,7 +54,8 @@ class Sync(private val context: Context, private val store: SentenceStore) {
 
                 // 远端还没有 → 把本地这份直接放上去
                 if (!exists || remoteJson == null) {
-                    if (!dav.put(store.serialize(), null)) continue
+                    val code = dav.put(store.serialize(), null)
+                    if (code !in 200..299) throw java.io.IOException("PUT $code")
                     return finish(cfg, context.getString(com.fred.wordwidget.R.string.sync_first_upload))
                 }
 
@@ -41,13 +63,21 @@ class Sync(private val context: Context, private val store: SentenceStore) {
                 val merged = merge(store.allIncludingDeleted(), remote)
                 val mergedJson = serialize(merged, store.deviceId)
 
+                // 只比 lists，**不能拿整个文件比**：文件里还有 deviceId（"最后谁写的"），
+                // 两台设备各不相同 —— 比它会导致一来一回互相把对方撞成 412
+                val mergedPayload = SentenceStore.serializeLists(merged)
+                val remotePayload = SentenceStore.serializeLists(remote)
+                val localPayload = SentenceStore.serializeLists(store.allIncludingDeleted())
+
                 // 合并结果跟远端一样 → 没必要写远端
-                if (mergedJson == remoteJson) {
-                    if (mergedJson != store.serialize()) store.replaceAll(merged)
+                if (mergedPayload == remotePayload) {
+                    if (mergedPayload != localPayload) store.replaceAll(merged)
                     return finish(cfg, context.getString(com.fred.wordwidget.R.string.sync_up_to_date))
                 }
 
-                if (!dav.put(mergedJson, etag)) continue      // 412：别人刚写过，重来
+                val code = dav.put(mergedJson, etag)
+                if (code == 412) continue                            // 别人刚写过，重来
+                if (code !in 200..299) throw java.io.IOException("PUT $code")
 
                 store.replaceAll(merged)
                 return finish(cfg, context.getString(com.fred.wordwidget.R.string.sync_done))
@@ -57,6 +87,8 @@ class Sync(private val context: Context, private val store: SentenceStore) {
             context.getString(com.fred.wordwidget.R.string.sync_failed, e.message ?: "")
         }
     }
+
+
 
     private fun finish(cfg: SyncPrefs, msg: String): String {
         cfg.lastSyncAt = System.currentTimeMillis()

@@ -47,8 +47,14 @@ internal class WebDav(private val fileUrl: String, private val user: String, pri
         }
     }
 
-    /** 推上去。etag 不为 null 时带 If-Match（乐观锁）；返回 false = 412，说明别人刚写过 */
-    fun put(content: String, etag: String?): Boolean {
+    /**
+     * 推上去，**返回 HTTP 状态码**。
+     *
+     * etag 不为 null 时带 If-Match（乐观锁）；412 = 别人在我们 GET 之后又写了一次，
+     * 得重新拉取再合并。把状态码交给调用方，界面上才能显示真实原因
+     * （只说"失败"没法区分是 401 密码错还是 412 撞车）。
+     */
+    fun put(content: String, etag: String?): Int {
         val c = URL(fileUrl).openConnection() as HttpURLConnection
         return try {
             c.requestMethod = "PUT"
@@ -62,9 +68,8 @@ internal class WebDav(private val fileUrl: String, private val user: String, pri
             c.outputStream.use { it.write(content.toByteArray(Charset.forName("UTF-8"))) }
 
             val code = c.responseCode
-            if (code == 412) return false            // Precondition Failed
-            if (code !in 200..299) throw IOException("PUT $code")
-            true
+            if (code !in 200..299) return code      // 含 412：交给调用方决定怎么处理
+            return code
         } finally {
             c.disconnect()
         }

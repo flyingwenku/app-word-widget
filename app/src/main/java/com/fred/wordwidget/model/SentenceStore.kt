@@ -288,7 +288,16 @@ class SentenceStore(context: Context) {
             )
         }
 
-        private fun toJson(items: List<SentenceList>, deviceId: String): String {
+        /**
+         * 只序列化 lists 部分 —— 用来判断"内容是不是真的变了"。
+         *
+         * 不能直接拿整个文件比：文件里还有 deviceId（"最后是谁写的"），
+         * 每台设备都不一样。比它会导致两台设备你写一次我写一次地空转，
+         * 还会互相把对方撞成 412（界面上就是"云端一直被别的一端改写"）。
+         */
+        fun serializeLists(items: List<SentenceList>): String = listArray(items).toString()
+
+        private fun listArray(items: List<SentenceList>): JSONArray {
             val arr = JSONArray()
             items.forEach { l ->
                 val ia = JSONArray()
@@ -315,12 +324,15 @@ class SentenceStore(context: Context) {
                     }
                 )
             }
-            return JSONObject().apply {
+            return arr
+        }
+
+        private fun toJson(items: List<SentenceList>, deviceId: String): String =
+            JSONObject().apply {
                 put("v", FORMAT_VERSION)
                 put("deviceId", deviceId)
-                put("lists", arr)
+                put("lists", listArray(items))
             }.toString()
-        }
 
         /** 解析另一端传来的文本（认不出返回 null，交给调用方当"没有远端数据"处理） */
         fun parse(json: String): MutableList<SentenceList>? = try {
