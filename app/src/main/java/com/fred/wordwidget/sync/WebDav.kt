@@ -16,7 +16,25 @@ import java.nio.charset.Charset
  * 认证用 Basic：坚果云要用**应用密码**（网页端"账户信息 → 添加应用"里生成），
  * 不是登录密码。
  */
-internal class WebDav(private val fileUrl: String, private val user: String, private val pass: String) {
+internal class WebDav(
+    private val fileUrl: String,
+    private val user: String,
+    private val pass: String,
+    /** 排查用的流水账：每次 GET / PUT 各记一行，最后跟着结果一起显示在界面上 */
+    private val log: StringBuilder? = null
+) {
+
+    private fun note(s: String) { log?.append(s)?.append('\n') }
+
+    /** 出错时把服务端返回的内容摘一段出来 —— 光看状态码常常不足以说明原因 */
+    private fun readErr(c: HttpURLConnection): String = try {
+        (c.errorStream ?: c.inputStream).readBytes()
+            .toString(Charset.forName("UTF-8"))
+            .replace('\n', ' ')
+            .take(200)
+    } catch (e: Exception) {
+        "(读不到响应体)"
+    }
 
     // data class 才能 `val (exists, etag, json) = dav.fetch()` 这样解构
     data class Fetched(val exists: Boolean, val etag: String?, val content: String?)
@@ -44,12 +62,24 @@ internal class WebDav(private val fileUrl: String, private val user: String, pri
             c.readTimeout = READ_TIMEOUT
 
             val code = c.responseCode
-            if (code == HttpURLConnection.HTTP_NOT_FOUND) return Fetched(false, null, null)
-            if (code !in 200..299) throw IOException("GET $code")
+            if (code == HttpURLConnection.HTTP_NOT_FOUND) {
+                note("GET -> 404（远端还没有这个文件）")
+                return Fetched(false, null, null)
+            }
+            if (code !in 200..299) {
+                note("GET -> $code body=${readErr(c)}")
+                throw IOException("GET $code")
+            }
 
-            // 有的服务器带引号（"abc"），有的还带弱标记（W/"abc"），一律剥掉
-            val etag = c.getHeaderField("ETag")?.trim('"', 'W', '/')
-            Fetched(true, etag, c.inputStream.readBytes().toString(Charset.forName("UTF-8")))
+            // 有的服务器带引号（"abc"），有的还带弱标记（W/"abc"），一律剥掉。
+            // raw 也一并记下来：ETag 一旦跟服务端校验的对不上，这就是唯一的线索
+            val raw = c.getHeaderField("ETag")
+            val etag = raw?.trim('"', 'W', '/')
+            val body = c.inputStream.readBytes().toString(Charset.forName("UTF-8"))
+
+            note("GET -> $code len=${body.length} etag=${etag ?: "(没有)"} raw=$raw " +
+                "lastmod=${c.getHeaderField("Last-Modified") ?: "-"}")
+            Fetched(true, etag, body)
         } finally {
             c.disconnect()
         }
@@ -73,11 +103,16 @@ internal class WebDav(private val fileUrl: String, private val user: String, pri
             c.connectTimeout = CONNECT_TIMEOUT
             c.readTimeout = READ_TIMEOUT
 
+            note("PUT len=${content.length} If-Match=${if (etag.isNullOrEmpty()) "(不带锁)" else "\"$etag\""}")
+
             c.outputStream.use { it.write(content.toByteArray(Charset.forName("UTF-8"))) }
 
             val code = c.responseCode
-            if (code !in 200..299) return code      // 含 412：交给调用方决定怎么处理
-            return code
+            note(
+                if (code in 200..299) "PUT -> $code（成功）"
+                else "PUT -> $code body=${readErr(c)}"
+            )
+            return code      // 含 412：交给调用方决定怎么处理
         } finally {
             c.disconnect()
         }
