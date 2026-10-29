@@ -75,8 +75,12 @@ class Sync(private val context: Context, private val store: SentenceStore) {
                     return finish(cfg, context.getString(com.fred.wordwidget.R.string.sync_up_to_date))
                 }
 
-                val code = dav.put(mergedJson, etag)
-                if (code == 412) continue                            // 别人刚写过，重来
+                // 第一次尝试带 If-Match 做乐观锁；再撞就**放弃乐观锁**直接写。
+                // 为什么：某些网络路径下（手机流量/不同 Wi-Fi）拿到的 ETag 跟服务端
+                // 校验时对不上，实测会反复 412 —— 死守乐观锁就永远写不进去。
+                // 合并本身是幂等的，偶尔一次无锁写入最坏只是"最后写入者胜"，不会丢数据。
+                val code = dav.put(mergedJson, if (attempt == 1) etag else null)
+                if (code == 412 && attempt < 3) continue
                 if (code !in 200..299) throw java.io.IOException("PUT $code")
 
                 store.replaceAll(merged)

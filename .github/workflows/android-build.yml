@@ -64,6 +64,18 @@ jobs:
           "$SDKM" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" > /dev/null
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
 
+      # debug 签名默认放在 ~/.android/debug.keystore，而它是"没有就新建"的 ——
+      #  runner 每次都是一台新机器，等于每次一把新钥匙 → 打出来的包签名都不一样，
+      #  手机上覆盖安装会被系统拒绝（只能先卸载，数据随之丢失）。
+      #  缓存住它，同一个项目后续的包才能平滑覆盖安装。
+      #  注意：GitHub 会清理超过 7 天没访问过的缓存，届时又会换钥匙；
+      #  彻底稳的做法是放一把正式 keystore 到 Actions Secrets。
+      - name: Cache debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: debug-keystore-${{ github.repository }}-v1
+
       # 优化点 #1：官方 Gradle action，自动缓存 caches / wrapper / build-cache
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
