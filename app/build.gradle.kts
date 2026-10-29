@@ -58,4 +58,8 @@ dependencies {
     // 依赖最小化：小组件用系统 AppWidgetProvider + RemoteViews，
     // 存储用 SharedPreferences / JSON，全程不引第三方库。
     implementation("androidx.core:core-ktx:1.15.0")
+
+    // 只跑汇单元测试：同步的稳定 uuid 取值和合并规则必须锁死，
+    // 任一处被改坏都会在 CI 上直接失败（本地不一定装了 SDK，靠云构建把关）
+    testImplementation("junit:junit:4.13.2")
 }

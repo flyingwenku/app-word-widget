@@ -98,6 +98,11 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
+      # 放在产物上传之后：测试失败时 APK 已经传上去了，不影响下载；
+      # 但 job 仍会标红 —— 同步的 uuid 取值/合并规则被改坏时必须在 CI 上拦住
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
       - name: Build summary
         run: |
           {
