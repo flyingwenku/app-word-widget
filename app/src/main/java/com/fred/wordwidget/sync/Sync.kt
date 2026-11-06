@@ -1,6 +1,7 @@
 package com.fred.wordwidget.sync
 
 import android.content.Context
+import com.fred.wordwidget.R
 import com.fred.wordwidget.model.Sentence
 import com.fred.wordwidget.model.SentenceList
 import com.fred.wordwidget.model.SentenceStore
@@ -8,31 +9,33 @@ import com.fred.wordwidget.prefs.SyncPrefs
 import java.util.UUID
 
 /**
- * 多端同步（坚果云 WebDAV 单文件），规则见 win-word-widget/docs/sync-spec.md。
+ * 多端同步（坚果云 WebDAV 单文件）。规格见知识库《多端同步规格》，
+ * 踩坑见《多端同步踩坑与解法（通用）》。
  *
- * 流程：拉远端 → 按 uuid 合并 → 带 ETag 乐观锁写回；412 说明别人刚写过，重来（最多 3 次）。
+ * 流程：**一次 GET → 按 uuid 合并 → 有变化才一次 PUT**。
+ * 不用 ETag / If-Match / 重试：坚果云 ETag 实测不可信（GET 刚拿到的值原样 PUT 会 412），
+ * 带锁和重试都只是白绕一圈；并发窗口只有零点几秒，靠合并的幂等性兜底即可。
+ * 这与新项目（桌面进度条）的同步策略一致。
  *
  * **必须在后台线程调用**：里面全是网络 + 文件读写。
  *
- * 一个刻意的设计：合并结果跟远端**一字不差**时就不 PUT ——
- * 否则会陷入"同步 → 触发保存 → 又同步"的空转，白耗流量。
+ * 两个刻意的设计：
+ *   - 合并结果跟远端**一字不差**时就不 PUT，否则会陷入"同步 → 触发保存 → 又同步"的空转。
+ *   - 变化判断**只比 lists**，不能拿整个文件比：文件里还有 deviceId（"最后谁写的"），
+ *     两台设备各不相同，比它会导致一来一回互相覆盖。
  */
 class Sync(private val context: Context, private val store: SentenceStore) {
 
-    /** 同步结果：一句话结论 + 排查用的流水账（每次 GET / PUT 各一行） */
-    data class SyncResult(val message: String, val log: String)
+    /** 同步结果：一句话结论。失败时 message 里带真实 HTTP 码或异常信息 */
+    data class SyncResult(val message: String)
 
     private val running = Any()
 
-    /** 返回结果与日志，可以直接显示在界面上 */
     fun syncNow(): SyncResult {
-        // 同时只允许一个同步在跑。以前没有这个保护：连点几下（或打开页面时的自动同步
-        // 跟手动点那一下撞上）就会两个线程拿着同一个 ETag 去写，
-        // 一个成功、另一个必被服务端判 412 —— 表现就是"云端一直被别的一端改写"
+        // 同时只允许一个同步在跑。连点几下（或打开页面时的自动同步跟手动那一下撞上）
+        // 会让两个线程各拿一份数据去写，白白多一次 PUT。
         synchronized(running) {
-            if (busy) return SyncResult(
-                context.getString(com.fred.wordwidget.R.string.sync_in_progress), "(上一次还没结束)"
-            )
+            if (busy) return SyncResult(context.getString(R.string.sync_in_progress))
             busy = true
         }
 
@@ -48,89 +51,63 @@ class Sync(private val context: Context, private val store: SentenceStore) {
 
     private fun doSync(): SyncResult {
         val cfg = SyncPrefs(context)
-        if (!cfg.ready) return SyncResult(
-            context.getString(com.fred.wordwidget.R.string.sync_need_account), "(账号没填齐)"
-        )
+        if (!cfg.ready) return SyncResult(context.getString(R.string.sync_need_account))
         cfg.lastAttemptAt = System.currentTimeMillis()
 
-        val log = StringBuilder()
-        log.append("url=${cfg.url}\nuser=${cfg.user}\n")
-        log.append("device=${store.deviceId.take(8)} 本机列表=${store.lists().size}\n")
-
-        val dav = WebDav(cfg.url, cfg.user, cfg.password, log)
+        val dav = WebDav(cfg.url, cfg.user, cfg.password)
+        val local = store.allIncludingDeleted()
 
         return try {
-            for (attempt in 1..3) {
-                log.append("\n--- 第 $attempt 次 ---\n")
-                val (exists, etag, remoteJson) = dav.fetch()
+            val fetched = dav.fetch()
+            val body = fetched.content
 
-                // 远端还没有 → 把本地这份直接放上去
-                if (!exists || remoteJson == null) {
-                    log.append("远端还没有文件 → 直接上传\n")
-                    val code = dav.put(store.serialize(), null)
-                    if (code !in 200..299) throw java.io.IOException("PUT $code")
-                    return result(log, cfg, context.getString(com.fred.wordwidget.R.string.sync_first_upload))
+            // 远端还没有文件 → 把本地这份直接放上去（本地也是空库就别写一个空文件）
+            if (!fetched.exists || body == null) {
+                if (local.isEmpty()) {
+                    return result(cfg, context.getString(R.string.sync_empty_no_upload))
                 }
-
-                val remote = SentenceStore.parse(remoteJson) ?: mutableListOf()
-                val merged = merge(store.allIncludingDeleted(), remote)
-                val mergedJson = serialize(merged, store.deviceId)
-
-                // 只比 lists，**不能拿整个文件比**：文件里还有 deviceId（"最后谁写的"），
-                // 两台设备各不相同 —— 比它会导致一来一回互相把对方撞成 412
-                val mergedPayload = SentenceStore.serializeLists(merged)
-                val remotePayload = SentenceStore.serializeLists(remote)
-                val localPayload = SentenceStore.serializeLists(store.allIncludingDeleted())
-
-                // 合并结果跟远端一样 → 没必要写远端
-                if (mergedPayload == remotePayload) {
-                    log.append("合并结果跟云端一致 → 不写\n")
-                    if (mergedPayload != localPayload) store.replaceAll(merged)
-                    return result(log, cfg, context.getString(com.fred.wordwidget.R.string.sync_up_to_date))
-                }
-
-                log.append("本机 ${localPayload.length} 字 / 云端 ${remotePayload.length} 字 / " +
-                    "合并 ${mergedPayload.length} 字 → 写回\n")
-
-                // 第一次尝试带 If-Match 做乐观锁；再撞就**放弃乐观锁**直接写。
-                // 为什么：某些网络路径下（手机流量/不同 Wi-Fi）拿到的 ETag 跟服务端
-                // 校验时对不上，实测会反复 412 —— 死守乐观锁就永远写不进去。
-                // 合并本身是幂等的，偶尔一次无锁写入最坏只是"最后写入者胜"，不会丢数据。
-                val code = dav.put(mergedJson, if (attempt == 1) etag else null)
-                if (code == 412) {
-                    log.append("412 —— 服务端说版本对不上（第 $attempt 次没写成）\n")
-                    if (attempt < 3) continue
-                }
-                if (code !in 200..299) throw java.io.IOException("PUT $code")
-
-                store.replaceAll(merged)
-                return result(log, cfg, context.getString(com.fred.wordwidget.R.string.sync_done))
+                dav.put(serialize(local, store.deviceId))
+                return result(cfg, context.getString(R.string.sync_first_upload))
             }
-            log.append("三次尝试都没写成\n")
-            result(log, cfg, context.getString(com.fred.wordwidget.R.string.sync_conflict_retry))
+
+            val remote = SentenceStore.parse(body) ?: mutableListOf()
+            val merged = merge(local, remote)
+
+            val mergedPayload = SentenceStore.serializeLists(merged)
+            val remotePayload = SentenceStore.serializeLists(remote)
+            val localPayload = SentenceStore.serializeLists(local)
+
+            // 合并结果跟远端一样 → 没必要写远端；本地落后就把合并结果收下
+            if (mergedPayload == remotePayload) {
+                if (mergedPayload != localPayload) store.replaceAll(merged)
+                return result(cfg, context.getString(R.string.sync_up_to_date))
+            }
+
+            dav.put(serialize(merged, store.deviceId))
+            store.replaceAll(merged)
+            result(cfg, context.getString(R.string.sync_done))
         } catch (e: Exception) {
-            log.append("\n异常：$e\n")
-            result(log, cfg, context.getString(com.fred.wordwidget.R.string.sync_failed, e.message ?: ""))
+            result(cfg, context.getString(R.string.sync_failed, e.message ?: ""))
         }
     }
 
-    private fun result(log: StringBuilder, cfg: SyncPrefs, msg: String): SyncResult {
+    private fun result(cfg: SyncPrefs, msg: String): SyncResult {
         cfg.lastSyncAt = System.currentTimeMillis()
-        return SyncResult(msg, log.toString())
+        return SyncResult(msg)
     }
-
-
-
-
 
     companion object {
 
-        /** 合并结果序列化成与 [SentenceStore] 一致的格式（同步层要用） */
+        /**
+         * 合并结果序列化成与 [SentenceStore] 一致的格式（同步层要用）。
+         * lists / items 都按 uuid 升序写出，保证 wire format 字节级确定，
+         * 两端不会因为"排列顺序不同"而反复认为内容变了。
+         */
         private fun serialize(lists: List<SentenceList>, deviceId: String): String {
             val arr = org.json.JSONArray()
-            lists.forEach { l ->
+            lists.sortedBy { it.uuid }.forEach { l ->
                 val ia = org.json.JSONArray()
-                l.items.forEach { s ->
+                l.items.sortedBy { it.uuid }.forEach { s ->
                     ia.put(
                         org.json.JSONObject().apply {
                             put("uuid", s.uuid)
@@ -161,12 +138,15 @@ class Sync(private val context: Context, private val store: SentenceStore) {
         }
 
         /**
-         * 按 uuid 对齐合并（docs/sync-spec.md §3）。**幂等**：两台设备各跑一次，结果相同。
+         * 按 uuid 对齐合并。**幂等**，且结果固定按 uuid 升序：
+         * 如果按"我这边原来的顺序"排，两端会各自认为跟对方不一样，
+         * 轮流把同样的数据按自己的顺序重写一遍，永远在空转。
          */
         fun merge(mine: List<SentenceList>, theirs: List<SentenceList>): MutableList<SentenceList> {
             val out = mutableListOf<SentenceList>()
 
-            val uuids = (mine + theirs).map { it.uuid }.filter { it.isNotEmpty() }.distinct()
+            val uuids = (mine + theirs).map { it.uuid }
+                .filter { it.isNotEmpty() }.distinct().sorted()
             for (uuid in uuids) {
                 val m = mine.firstOrNull { it.uuid == uuid }
                 val t = theirs.firstOrNull { it.uuid == uuid }
@@ -192,7 +172,8 @@ class Sync(private val context: Context, private val store: SentenceStore) {
 
         private fun mergeItems(mine: List<Sentence>, theirs: List<Sentence>): List<Sentence> {
             val out = mutableListOf<Sentence>()
-            val uuids = (mine + theirs).map { it.uuid }.filter { it.isNotEmpty() }.distinct()
+            val uuids = (mine + theirs).map { it.uuid }
+                .filter { it.isNotEmpty() }.distinct().sorted()
             for (uuid in uuids) {
                 val m = mine.firstOrNull { it.uuid == uuid }
                 val t = theirs.firstOrNull { it.uuid == uuid }
@@ -208,15 +189,26 @@ class Sync(private val context: Context, private val store: SentenceStore) {
             return out
         }
 
-        /** 最后写入者胜；时间戳完全一样时按内容定序，保证两端收敛到同一结果 */
+        /**
+         * 时间戳完全相同时的定序键。**两端必须逐字一致**：
+         * Windows 端用 `Name + "|" + (Deleted ? "1" : "0")` 做 String.CompareOrdinal
+         * 并挑**较大**的那个；这里必须一样。否则同一毫秒两端各改一次会各选各的，永远收敛不了。
+         */
+        fun tieKeyList(x: SentenceList): String =
+            x.name + "|" + (if (x.deleted) "1" else "0")
+
+        fun tieKeySentence(x: Sentence): String =
+            x.text + "|" + x.source + "|" + (if (x.deleted) "1" else "0")
+
+        /** 最后写入者胜；时间戳完全一样时按上面的键挑较大者 */
         private fun newer(a: SentenceList, b: SentenceList): Boolean {
             if (a.updatedAt != b.updatedAt) return a.updatedAt > b.updatedAt
-            return a.name <= b.name
+            return tieKeyList(a) >= tieKeyList(b)
         }
 
         private fun newer(a: Sentence, b: Sentence): Boolean {
             if (a.updatedAt != b.updatedAt) return a.updatedAt > b.updatedAt
-            return (a.text + "|" + a.source) <= (b.text + "|" + b.source)
+            return tieKeySentence(a) >= tieKeySentence(b)
         }
 
         private fun copyList(x: SentenceList) = SentenceList(

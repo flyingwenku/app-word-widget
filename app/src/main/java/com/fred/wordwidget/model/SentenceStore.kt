@@ -13,7 +13,7 @@ import java.util.UUID
  * 存储：App 私有目录 lists.json（沿用项目三的 JSON 做法，零依赖）。
  * 首次启动预置一个「论语」列表，方便开箱即测。
  *
- * 文件格式 v3（多端同步的地基，规格见 win-word-widget/docs/sync-spec.md）：
+ * 文件格式 v3（多端同步的地基，规格见 知识库《多端同步规格》）：
  *   {"v":3,"deviceId":…,"lists":[{"uuid":…,"n":…,"updatedAt":…,"deleted":…,
  *                                 "items":[{"uuid":…,"t":…,"s":…,"updatedAt":…,"deleted":…}]}]}
  *

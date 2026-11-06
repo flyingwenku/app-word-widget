@@ -15,16 +15,18 @@ import java.nio.charset.Charset
  *
  * 认证用 Basic：坚果云要用**应用密码**（网页端"账户信息 → 添加应用"里生成），
  * 不是登录密码。
+ *
+ * **刻意不带 ETag / If-Match**：坚果云实测 GET 刚拿到的 ETag，原样带回去 PUT
+ * 立刻被判 412 `ETag doesn't match`；同一个 ETag 还对应过两份不同的内容。
+ * 乐观锁在这套后端上等于废的，重试也只会反复撞。同步层改成
+ * "一次 GET → 合并 → 一次 PUT"，并发靠合并的幂等性兜底。
+ * 踩坑详见知识库《多端同步踩坑与解法（通用）》。
  */
 internal class WebDav(
     private val fileUrl: String,
     private val user: String,
-    private val pass: String,
-    /** 排查用的流水账：每次 GET / PUT 各记一行，最后跟着结果一起显示在界面上 */
-    private val log: StringBuilder? = null
+    private val pass: String
 ) {
-
-    private fun note(s: String) { log?.append(s)?.append('\n') }
 
     /** 出错时把服务端返回的内容摘一段出来 —— 光看状态码常常不足以说明原因 */
     private fun readErr(c: HttpURLConnection): String = try {
@@ -36,23 +38,19 @@ internal class WebDav(
         "(读不到响应体)"
     }
 
-    // data class 才能 `val (exists, etag, json) = dav.fetch()` 这样解构
-    data class Fetched(val exists: Boolean, val etag: String?, val content: String?)
+    data class Fetched(val exists: Boolean, val content: String?)
 
     /**
-     * 拉远端文件。
+     * 拉远端文件。存在性**只看 GET 是不是 404** —— 坚果云的 PROPFIND 响应不带 ETag 头，
+     * 早期实现把"拿不到 ETag"当成"文件不存在"，每次启动都把本地覆盖上去，
+     * 另一端刚加的句子直接被抹掉。现在完全不碰 ETag。
      *
-     * 存在性只看 GET 是不是 404 —— **不能**用"有没有 ETag"来判断
-     * （坚果云的 PROPFIND 压根不带 ETag 头，Windows 端踩过：被判成"文件不存在"，
-     * 每次都把本地覆盖上去，另一端刚加的句子直接没了）。
+     * GET 必须绕开缓存：坚果云返回 `Cache-Control: max-age=5`，命中缓存会拿到旧内容，
+     * 于是"写完马上又读"的场景会读到上一版，凭空制造一次覆盖写。
      */
     fun fetch(): Fetched {
         val c = URL(fileUrl).openConnection() as HttpURLConnection
         return try {
-            // 坚果云的响应头是 Cache-Control: max-age=5 —— GET 结果允许被缓存 5 秒。
-            // 一旦被缓存（ROM / Wi-Fi 代理 / 移动网络都可能），第二次同步拿到的还是上一次的
-            // ETag，而服务端此时已经换过了 → 必然 412，还会连着失败三次
-            // （就是那个"云端一直被别的一端改写"）。同步场景里 GET 绝不能用缓存。
             c.useCaches = false
             c.setRequestProperty("Cache-Control", "no-cache")
             c.setRequestProperty("Pragma", "no-cache")
@@ -62,57 +60,34 @@ internal class WebDav(
             c.readTimeout = READ_TIMEOUT
 
             val code = c.responseCode
-            if (code == HttpURLConnection.HTTP_NOT_FOUND) {
-                note("GET -> 404（远端还没有这个文件）")
-                return Fetched(false, null, null)
-            }
-            if (code !in 200..299) {
-                note("GET -> $code body=${readErr(c)}")
-                throw IOException("GET $code")
-            }
+            if (code == HttpURLConnection.HTTP_NOT_FOUND) return Fetched(false, null)
+            if (code !in 200..299) throw IOException("GET $code: ${readErr(c)}")
 
-            // 有的服务器带引号（"abc"），有的还带弱标记（W/"abc"），一律剥掉。
-            // raw 也一并记下来：ETag 一旦跟服务端校验的对不上，这就是唯一的线索
-            val raw = c.getHeaderField("ETag")
-            val etag = raw?.trim('"', 'W', '/')
             val body = c.inputStream.readBytes().toString(Charset.forName("UTF-8"))
-
-            note("GET -> $code len=${body.length} etag=${etag ?: "(没有)"} raw=$raw " +
-                "lastmod=${c.getHeaderField("Last-Modified") ?: "-"}")
-            Fetched(true, etag, body)
+            Fetched(true, body)
         } finally {
             c.disconnect()
         }
     }
 
     /**
-     * 推上去，**返回 HTTP 状态码**。
-     *
-     * etag 不为 null 时带 If-Match（乐观锁）；412 = 别人在我们 GET 之后又写了一次，
-     * 得重新拉取再合并。把状态码交给调用方，界面上才能显示真实原因
-     * （只说"失败"没法区分是 401 密码错还是 412 撞车）。
+     * 推上去。**没有 If-Match、没有 412 分支、没有重试**，非 2xx 直接抛，
+     * 让界面能显示真实 HTTP 码（401 密码错 / 507 空间满 / 5xx 服务端）。
      */
-    fun put(content: String, etag: String?): Int {
+    fun put(content: String) {
         val c = URL(fileUrl).openConnection() as HttpURLConnection
-        return try {
+        try {
             c.requestMethod = "PUT"
             c.doOutput = true
             c.setRequestProperty("Authorization", auth())
             c.setRequestProperty("Content-Type", "application/json")
-            if (!etag.isNullOrEmpty()) c.setRequestProperty("If-Match", "\"$etag\"")
             c.connectTimeout = CONNECT_TIMEOUT
             c.readTimeout = READ_TIMEOUT
-
-            note("PUT len=${content.length} If-Match=${if (etag.isNullOrEmpty()) "(不带锁)" else "\"$etag\""}")
 
             c.outputStream.use { it.write(content.toByteArray(Charset.forName("UTF-8"))) }
 
             val code = c.responseCode
-            note(
-                if (code in 200..299) "PUT -> $code（成功）"
-                else "PUT -> $code body=${readErr(c)}"
-            )
-            return code      // 含 412：交给调用方决定怎么处理
+            if (code !in 200..299) throw IOException("PUT $code: ${readErr(c)}")
         } finally {
             c.disconnect()
         }

@@ -2,8 +2,6 @@ package com.fred.wordwidget
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
@@ -287,30 +285,16 @@ class MainActivity : Activity() {
 
     private fun runSync() {
         thread {
+            // 排查 412 时曾在这里把 GET / PUT 流水账弹成对话框。根因定案后
+            // （坚果云 ETag 不可信）已经去掉：日常同步只 Toast 一句结论，
+            // 失败时 message 里带真实 HTTP 码，不再打扰使用。
             val r = Sync(this, store).syncNow()
             handler.post {
                 toast(r.message)
-                // 结论 + 流水账一起显示：屏幕上就能看出 GET 拿到了什么、
-                // PUT 到底被服务端怎么回的，不用连电脑抓包
-                if (r.log.isNotBlank()) showSyncLog(r)
                 refreshSpinner()
                 SentenceWidget.refreshAll(this)
             }
         }
-    }
-
-    private fun showSyncLog(r: Sync.SyncResult) {
-        AlertDialog.Builder(this)
-            .setTitle(r.message)
-            .setMessage(r.log)
-            .setPositiveButton(R.string.copy) { _, _ ->
-                (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(
-                    ClipData.newPlainText("yiju-sync", r.log)
-                )
-                toast(R.string.copied)
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     private fun syncSettings() {

@@ -25,7 +25,7 @@ import java.util.UUID
  *   不加最后那次换序        7356bd5c-22d8-59a6-84e1-4fadcc544464   ❌
  *   命名空间也用大端        4ff3f2bc-100c-4657-96a5-393c79ae3229   ❌
  *
- * 改这个文件之前先跑一遍 win-word-widget/docs/sync-spec.md §2 里的对照值。
+ * 改这个文件之前先跑一遍 知识库《多端同步规格》 §2 里的对照值。
  */
 object StableId {
 

@@ -11,7 +11,7 @@ import com.fred.wordwidget.model.SentenceStore
  *
  * v1.4 起"用哪个列表 / 固定句 / 当前句"改成存 **uuid**：
  * 以前存的是数字 id，那是各端自己记账的，同步之后不是同一个东西
- * （见 win-word-widget/docs/sync-spec.md）。
+ * （见 知识库《多端同步规格》）。
  */
 class WidgetPrefs(context: Context) {
 
